@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload de Documentos RAG</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            margin-top: 0;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+        input[type="file"] {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #f9f9f9;
+        }
+        .options {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .option-group {
+            flex: 1;
+        }
+        input[type="number"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        button:disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
+        }
+        #result {
+            margin-top: 30px;
+            padding: 15px;
+            border-radius: 4px;
+            display: none;
+        }
+        #result.success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+            display: block;
+        }
+        #result.error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+            display: block;
+        }
+        .progress-container {
+            margin-top: 20px;
+            display: none;
+        }
+        .progress-bar {
+            height: 8px;
+            background-color: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .progress {
+            height: 100%;
+            background-color: #3498db;
+            width: 0%;
+            transition: width 0.3s;
+        }
+        .detail-section {
+            margin-top: 20px;
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            border-left: 4px solid #3498db;
+        }
+        .detail-item {
+            margin-bottom: 8px;
+        }
+        .detail-item strong {
+            display: inline-block;
+            width: 150px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Upload de Documentos para RAG</h1>
+        
+        <form id="uploadForm" enctype="multipart/form-data">
+            <div class="form-group">
+                <label for="file">Selecione um arquivo PDF:</label>
+                <input type="file" id="file" name="file" accept=".pdf" required>
+            </div>
+            
+            <div class="options">
+                <div class="option-group">
+                    <label for="chunkSize">Tamanho do Chunk:</label>
+                    <input type="number" id="chunkSize" name="chunkSize" value="1000" min="100" max="5000">
+                </div>
+                <div class="option-group">
+                    <label for="overlap">Sobreposição:</label>
+                    <input type="number" id="overlap" name="overlap" value="200" min="0" max="1000">
+                </div>
+            </div>
+            
+            <button type="submit" id="uploadButton">Fazer Upload</button>
+        </form>
+        
+        <div class="progress-container" id="progressContainer">
+            <p>Processando documento...</p>
+            <div class="progress-bar">
+                <div class="progress" id="progressBar"></div>
+            </div>
+        </div>
+        
+        <div id="result"></div>
+        <div id="details" class="detail-section" style="display: none;">
+            <h3>Detalhes do Processamento</h3>
+            <div id="detailContent"></div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('uploadForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData();
+            const fileInput = document.getElementById('file');
+            const chunkSize = document.getElementById('chunkSize').value;
+            const overlap = document.getElementById('overlap').value;
+            const resultDiv = document.getElementById('result');
+            const progressContainer = document.getElementById('progressContainer');
+            const progressBar = document.getElementById('progressBar');
+            const uploadButton = document.getElementById('uploadButton');
+            const details = document.getElementById('details');
+            const detailContent = document.getElementById('detailContent');
+            
+            // Validar arquivo
+            if (!fileInput.files[0]) {
+                resultDiv.textContent = 'Por favor, selecione um arquivo.';
+                resultDiv.className = 'error';
+                return;
+            }
+            
+            // Montar formData
+            formData.append('file', fileInput.files[0]);
+            formData.append('chunkSize', chunkSize);
+            formData.append('overlap', overlap);
+            
+            // Resetar visualização
+            resultDiv.style.display = 'none';
+            details.style.display = 'none';
+            progressContainer.style.display = 'block';
+            progressBar.style.width = '10%';
+            uploadButton.disabled = true;
+            
+            try {
+                const response = await fetch('/api/ai/document-upload/pdf', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                progressBar.style.width = '100%';
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    resultDiv.textContent = data.message;
+                    resultDiv.className = 'success';
+                    
+                    // Mostrar detalhes
+                    detailContent.innerHTML = `
+                        <div class="detail-item"><strong>Nome do arquivo:</strong> ${data.filename}</div>
+                        <div class="detail-item"><strong>ID do arquivo:</strong> ${data.fileId}</div>
+                        <div class="detail-item"><strong>Total de chunks:</strong> ${data.totalChunks}</div>
+                        <div class="detail-item"><strong>Tamanho do chunk:</strong> ${chunkSize}</div>
+                        <div class="detail-item"><strong>Sobreposição:</strong> ${overlap}</div>
+                    `;
+                    details.style.display = 'block';
+                } else {
+                    resultDiv.textContent = data.message || 'Erro ao processar o documento.';
+                    resultDiv.className = 'error';
+                }
+            } catch (error) {
+                resultDiv.textContent = 'Erro na comunicação com o servidor: ' + error.message;
+                resultDiv.className = 'error';
+            } finally {
+                resultDiv.style.display = 'block';
+                progressContainer.style.display = 'none';
+                uploadButton.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>

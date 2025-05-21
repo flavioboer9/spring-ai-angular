@@ -26,7 +26,7 @@ public class RagReader {
     public VectorStore ragVectorStore(VectorStore vectorStore, JdbcTemplate jdbcTemplate) {
 
         // check if the document is already in the vector store
-        Integer count = jdbcTemplate.queryForObject("select count(*) from vector_store", Integer.class);
+        Integer count = jdbcTemplate.queryForObject("select count(*) from vector_stores", Integer.class);
 
         if (count != null && count > 0) {
             return vectorStore;
